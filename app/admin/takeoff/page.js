@@ -1,15 +1,29 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload } from "lucide-react";
+import { supabase, supabaseAdmin } from "@/lib/supabaseClient";
+import { useSearchParams } from "next/navigation";
 
 const processingSteps = ["Analyzing document structure", "Extracting text content", "Identifying key elements", "Processing CAD data", "Generating cost estimates", "Compiling final report"];
 
 export default function FileProcessor() {
 	const [file, setFile] = useState(null);
+	const [processing, setProcessing] = useState(false);
+	const [layersData, setLayersData] = useState(null);
+	const [token, setToken] = useState(null);
+	const searchParams = useSearchParams();
+
+	useEffect(() => {
+		const accessToken = searchParams.get("access_token");
+		if (accessToken) {
+			setToken(accessToken);
+			// You might want to store this token securely, e.g., in HttpOnly cookies
+		}
+	}, [searchParams]);
 
 	const onDrop = useCallback((acceptedFiles) => {
 		setFile(acceptedFiles[0]);
@@ -25,13 +39,56 @@ export default function FileProcessor() {
 		multiple: false,
 	});
 
-	const handleSubmit = (event) => {
+	const handleSubmit = async (event) => {
 		event.preventDefault();
 		if (!file) return;
-		// For now, we'll just log the file information
-		console.log("File selected:", file.name);
-		// You can add more logic here later when ready to process the file
+
+		setProcessing(true);
+		try {
+			const formData = new FormData();
+			formData.append("file", file);
+
+			const response = await fetch("/api/upload", {
+				method: "POST",
+				body: formData,
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Failed to upload file");
+			}
+
+			const result = await response.json();
+			console.log("File processed successfully:", result);
+
+			setLayersData({
+				fileName: result.path,
+				size: file.size,
+				urn: result.urn,
+				layers: result.layers,
+			});
+		} catch (error) {
+			console.error("Error processing file:", error);
+		} finally {
+			setProcessing(false);
+		}
 	};
+
+	if (!token) {
+		return (
+			<div className="container p-4 mx-auto space-y-8">
+				<Card>
+					<CardHeader>
+						<CardTitle>Authorization Required</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<p>Please authorize the application to proceed.</p>
+						<Button onClick={() => (window.location.href = "/api/auth/authorize")}>Authorize</Button>
+					</CardContent>
+				</Card>
+			</div>
+		);
+	}
 
 	return (
 		<div className="container p-4 mx-auto space-y-8">
@@ -48,8 +105,8 @@ export default function FileProcessor() {
 							<p className="mt-1 text-xs text-gray-500">Supported files: PDF, DWG, DXF</p>
 						</div>
 						{file && <p className="text-sm text-gray-600">Selected file: {file.name}</p>}
-						<Button type="submit" disabled={!file}>
-							Process File
+						<Button type="submit" disabled={!file || processing}>
+							{processing ? "Processing..." : "Process File"}
 						</Button>
 					</form>
 				</CardContent>
@@ -70,6 +127,25 @@ export default function FileProcessor() {
 					</div>
 				</CardContent>
 			</Card>
+
+			{layersData && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Extracted Layers</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<p>File: {layersData.fileName}</p>
+						<p>Size: {layersData.size} bytes</p>
+						<p>URN: {layersData.urn}</p>
+						<h3>Layers:</h3>
+						<ul>
+							{layersData.layers.map((layer, index) => (
+								<li key={index}>{layer.name}</li>
+							))}
+						</ul>
+					</CardContent>
+				</Card>
+			)}
 		</div>
 	);
 }
