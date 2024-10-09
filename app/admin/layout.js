@@ -228,54 +228,51 @@ function Sidebar() {
   const { isOpen, setIsOpen, currentItem, setCurrentItem } = useSidebarContext()
 
   const menuItems = [
-    { name: 'Estimates', icon: FileText, href: '/admin/' },
-    { name: 'Line Items', icon: List, href: '/admin/line-items' },
-    { name: 'Tags', icon: Tag, href: '/admin/tags' },
-    { name: 'Units', icon: Ruler, href: '/admin/units' },
-    { name: 'Users', icon: Users, href: '/admin/users' },
-    { name: 'Settings', icon: Settings, href: '/admin/settings' },
-  ]
+		{ name: "Takoff", icon: FileText, href: "/admin/takeoff" },
+		{ name: "Estimates", icon: FileText, href: "/admin/" },
+		{ name: "Line Items", icon: List, href: "/admin/line-items" },
+		{ name: "Tags", icon: Tag, href: "/admin/tags" },
+		{ name: "Units", icon: Ruler, href: "/admin/units" },
+		{ name: "Users", icon: Users, href: "/admin/users" },
+		{ name: "Settings", icon: Settings, href: "/admin/settings" },
+  ];
 
   return (
-    <div className={`bg-muted/40 flex-shrink-0 border-r ${isOpen ? 'w-64' : 'w-16'} transition-all duration-300 ease-in-out`}>
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-2">
-            <Package2 className="w-6 h-6" />
-            {isOpen && <span className="text-lg font-bold">EstiMate Pro</span>}
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </Button>
-        </div>
-        <Separator />
-        <ScrollArea className="flex-1">
-          <nav className="p-2">
-            {menuItems.map((item, index) => (
-              <React.Fragment key={item.name}>
-                <Tooltip delayDuration={300}>
-                  <TooltipTrigger asChild>
-                    <Link href={item.href} passHref>
-                      <Button
-                        variant={currentItem === item.name ? "secondary" : "ghost"}
-                        className={`w-full justify-start mb-1 ${isOpen ? 'px-4' : 'px-0 justify-center'}`}
-                        onClick={() => setCurrentItem(item.name)}
-                      >
-                        <item.icon className={`h-5 w-5 ${isOpen ? 'mr-2' : ''}`} />
-                        {isOpen && <span>{item.name}</span>}
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" sideOffset={10}>
-                    {item.name}
-                  </TooltipContent>
-                </Tooltip>
-                {(index === 0 || index === 3) && <Separator className="my-2" />}
-              </React.Fragment>
-            ))}
-          </nav>
-        </ScrollArea>
-      </div>
-    </div>
-  )
+		<div className={`bg-muted/40 flex-shrink-0 border-r ${isOpen ? "w-64" : "w-16"} transition-all duration-300 ease-in-out`}>
+			<div className="flex flex-col h-full">
+				<div className="flex items-center justify-between p-4">
+					<div className="flex items-center space-x-2">
+						<Package2 className="w-6 h-6" />
+						{isOpen && <span className="text-lg font-bold">EstiMate Pro</span>}
+					</div>
+					<Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)}>
+						{isOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+					</Button>
+				</div>
+				<Separator />
+				<ScrollArea className="flex-1">
+					<nav className="p-2">
+						{menuItems.map((item, index) => (
+							<React.Fragment key={item.name}>
+								<Tooltip delayDuration={300}>
+									<TooltipTrigger asChild>
+										<Link href={item.href} passHref>
+											<Button variant={currentItem === item.name ? "secondary" : "ghost"} className={`w-full justify-start mb-1 ${isOpen ? "px-4" : "px-0 justify-center"}`} onClick={() => setCurrentItem(item.name)}>
+												<item.icon className={`h-5 w-5 ${isOpen ? "mr-2" : ""}`} />
+												{isOpen && <span>{item.name}</span>}
+											</Button>
+										</Link>
+									</TooltipTrigger>
+									<TooltipContent side="right" sideOffset={10}>
+										{item.name}
+									</TooltipContent>
+								</Tooltip>
+								{(index === 1 || index === 4) && <Separator className="my-2" />}
+							</React.Fragment>
+						))}
+					</nav>
+				</ScrollArea>
+			</div>
+		</div>
+  );
 }
