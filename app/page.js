@@ -73,7 +73,7 @@ export default function Home() {
         <h2 className="mb-12 text-4xl font-bold text-center text-blue-800">What Our Customers Say</h2>
         <div className="p-8 bg-white rounded-lg shadow-lg">
           <p className="mb-6 text-xl text-gray-600">
-            "Our plumbing estimates are now 98% more accurate, with clear breakdowns by system and unit. It's saved us time and improved our bid success rate!"
+          &quot;Our plumbing estimates are now 98% more accurate, with clear breakdowns by system and unit. It&apos;s saved us time and improved our bid success rate!&quot;
           </p>
           <p className="font-semibold text-blue-700">- John Doe, Master Plumber</p>
         </div>
