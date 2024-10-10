@@ -1,52 +1,84 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
-import { translateFile, getManifest, getMetadata } from "@/lib/forgeClient";
+import { extractDWGMetadata } from "@/lib/forgeClient";
 
-export async function POST(request) {
-	const formData = await request.formData();
-	const file = formData.get("file");
+const BUCKET_NAME = "dwg-files";
 
-	if (!file) {
-		return NextResponse.json({ error: "No file provided" }, { status: 400 });
+async function ensureBucketExists() {
+	const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
+	
+	if (error) {
+		console.error("Error listing buckets:", error);
+		throw error;
 	}
 
-	try {
-		// Upload to Supabase
-		const fileExt = file.name.split(".").pop();
-		const fileName = `${Math.random()}.${fileExt}`;
-		const filePath = `uploads/${fileName}`;
+	const bucketExists = buckets.some(bucket => bucket.name === BUCKET_NAME);
 
-		const { data, error } = await supabaseAdmin.storage.from("test").upload(filePath, file, {
-			cacheControl: "3600",
-			upsert: false,
+	if (!bucketExists) {
+		const { data, error: createError } = await supabaseAdmin.storage.createBucket(BUCKET_NAME, {
+			public: false,
+			fileSizeLimit: 52428800 // 50MB
 		});
 
-		if (error) throw error;
+		if (createError) {
+			console.error("Error creating bucket:", createError);
+			throw createError;
+		}
 
-		// Get public URL of the uploaded file
-		const { data: publicUrlData } = supabaseAdmin.storage.from("test").getPublicUrl(filePath);
+		console.log("Bucket created:", BUCKET_NAME);
+	} else {
+		console.log("Bucket already exists:", BUCKET_NAME);
+	}
+}
 
-		// Translate file using Forge API
-		const urn = await translateFile(publicUrlData.publicUrl);
+export async function POST(request) {
+	try {
+		await ensureBucketExists();
 
-		// Wait for the translation to complete (you might want to implement a polling mechanism here)
-		await new Promise((resolve) => setTimeout(resolve, 10000));
+		const formData = await request.formData();
+		const file = formData.get("file");
 
-		// Get manifest and metadata
-		const manifest = await getManifest(urn);
-		const metadata = await getMetadata(urn);
+		if (!file) {
+			return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+		}
 
-		// Extract layers (this is a simplified example, you'll need to parse the metadata)
-		const layers = metadata.data.metadata[0].layers || [];
+		const buffer = Buffer.from(await file.arrayBuffer());
+		const fileBuffer = {
+			name: file.name,
+			buffer: buffer
+		};
+
+		// Upload to Supabase
+		const { data, error } = await supabaseAdmin.storage
+			.from(BUCKET_NAME)
+			.upload(`${Date.now()}_${file.name}`, buffer);
+
+		if (error) {
+			console.error("Supabase upload error:", error);
+			throw error;
+		}
+
+		// Extract metadata using Forge
+		const forgeData = await extractDWGMetadata(fileBuffer);
+
+		if (forgeData.error) {
+			console.error("Error extracting metadata:", forgeData.error);
+		}
+
+		console.log('Forge data:', forgeData);
 
 		return NextResponse.json({
 			success: true,
-			path: data.path,
-			urn: urn,
-			layers: layers,
+			supabasePath: data.path,
+			forgeData: forgeData,
+			urn: forgeData.urn // Make sure this is the base64 encoded URN
 		});
+
 	} catch (error) {
 		console.error("Error processing file:", error);
-		return NextResponse.json({ error: error.message }, { status: 500 });
+		return NextResponse.json({ 
+			error: error.message, 
+			details: error.stack
+		}, { status: 500 });
 	}
 }

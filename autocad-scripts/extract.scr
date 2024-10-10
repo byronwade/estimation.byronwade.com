@@ -1,0 +1,44 @@
+(setq all-data '())
+
+; Function to extract entity data
+(defun extract-entity-data (ent)
+  (list
+    (cons 'type (cdr (assoc 0 (entget ent))))
+    (cons 'layer (cdr (assoc 8 (entget ent))))
+    (cons 'properties (entget ent))
+  )
+)
+
+; Iterate through all entities in the drawing
+(setq ss (ssget "X"))
+(if ss
+  (progn
+    (setq i 0)
+    (while (< i (sslength ss))
+      (setq ent (ssname ss i))
+      (setq all-data (cons (extract-entity-data ent) all-data))
+      (setq i (1+ i))
+    )
+  )
+)
+
+; Extract block definitions
+(setq all-blocks '())
+(vlax-for block (vla-get-Blocks (vla-get-ActiveDocument (vlax-get-acad-object)))
+  (setq all-blocks (cons (list (cons 'name (vla-get-Name block)) (cons 'entities (extract-block-entities block))) all-blocks))
+)
+
+; Extract layers
+(setq all-layers '())
+(vlax-for layer (vla-get-Layers (vla-get-ActiveDocument (vlax-get-acad-object)))
+  (setq all-layers (cons (list (cons 'name (vla-get-Name layer)) (cons 'color (vla-get-Color layer))) all-layers))
+)
+
+; Write data to JSON file
+(setq json-data (list (cons 'entities all-data) (cons 'blocks all-blocks) (cons 'layers all-layers)))
+(setq json-string (vl-princ-to-string json-data))
+(setq output-file (open "output.json" "w"))
+(write-line json-string output-file)
+(close output-file)
+
+(quit)

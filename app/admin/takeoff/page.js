@@ -4,24 +4,45 @@ import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload } from "lucide-react";
-import { supabase, supabaseAdmin } from "@/lib/supabaseClient";
+import { Upload, ChevronDown, ChevronUp } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-const processingSteps = ["Analyzing document structure", "Extracting text content", "Identifying key elements", "Processing CAD data", "Generating cost estimates", "Compiling final report"];
+function CollapsibleJSON({ title, data }) {
+	const [isOpen, setIsOpen] = useState(false);
+
+	return (
+		<div className="mb-4">
+			<Button
+				onClick={() => setIsOpen(!isOpen)}
+				variant="outline"
+				className="justify-between w-full"
+			>
+				{title}
+				{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+			</Button>
+			{isOpen && (
+				<pre className="p-4 mt-2 overflow-x-auto bg-gray-100 rounded">
+					{JSON.stringify(data, null, 2)}
+				</pre>
+			)}
+		</div>
+	);
+}
 
 export default function FileProcessor() {
 	const [file, setFile] = useState(null);
 	const [processing, setProcessing] = useState(false);
-	const [layersData, setLayersData] = useState(null);
+	const [forgeData, setForgeData] = useState(null);
 	const [token, setToken] = useState(null);
+	const [error, setError] = useState(null);
+	const [propertyData, setPropertyData] = useState(null);
 	const searchParams = useSearchParams();
 
 	useEffect(() => {
 		const accessToken = searchParams.get("access_token");
 		if (accessToken) {
+			console.log('Setting access token:', accessToken);
 			setToken(accessToken);
-			// You might want to store this token securely, e.g., in HttpOnly cookies
 		}
 	}, [searchParams]);
 
@@ -44,105 +65,144 @@ export default function FileProcessor() {
 		if (!file) return;
 
 		setProcessing(true);
-		try {
-			const formData = new FormData();
-			formData.append("file", file);
+		setError(null);
 
+		const formData = new FormData();
+		formData.append("file", file);
+
+		try {
 			const response = await fetch("/api/upload", {
 				method: "POST",
 				body: formData,
 			});
 
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to upload file");
+				throw new Error("File upload failed");
 			}
 
-			const result = await response.json();
-			console.log("File processed successfully:", result);
-
-			setLayersData({
-				fileName: result.path,
-				size: file.size,
-				urn: result.urn,
-				layers: result.layers,
-			});
+			const data = await response.json();
+			console.log('Forge API response:', data);
+			setForgeData(data.forgeData);
+			
+			if (data.forgeData && data.forgeData.propertyDatabases) {
+				setPropertyData(data.forgeData.propertyDatabases);
+				const takeoffData = processPropertyData(data.forgeData.propertyDatabases);
+				console.log('Takeoff Data:', takeoffData);
+				// You can set this to a new state variable if you want to display it
+				// setTakeoffData(takeoffData);
+			}
 		} catch (error) {
 			console.error("Error processing file:", error);
+			setError(error.message || "An error occurred while processing the file");
 		} finally {
 			setProcessing(false);
 		}
 	};
 
-	if (!token) {
-		return (
-			<div className="container p-4 mx-auto space-y-8">
-				<Card>
-					<CardHeader>
-						<CardTitle>Authorization Required</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<p>Please authorize the application to proceed.</p>
-						<Button onClick={() => (window.location.href = "/api/auth/authorize")}>Authorize</Button>
-					</CardContent>
-				</Card>
-			</div>
-		);
+	function processPropertyData(propertyData) {
+		const takeoffData = {
+			pipes: [],
+			fittings: []
+		};
+
+		propertyData.forEach(database => {
+			if (database.data && database.data.collection) {
+				database.data.collection.forEach(item => {
+					if (item.name === 'Pipe') {
+						takeoffData.pipes.push({
+							id: item.objectid,
+							diameter: item.properties.find(prop => prop.name === 'Diameter')?.value,
+							length: item.properties.find(prop => prop.name === 'Length')?.value,
+							material: item.properties.find(prop => prop.name === 'Material')?.value
+						});
+					} else if (item.name === 'Fitting') {
+						takeoffData.fittings.push({
+							id: item.objectid,
+							type: item.properties.find(prop => prop.name === 'Type')?.value,
+							size: item.properties.find(prop => prop.name === 'Size')?.value
+						});
+					}
+				});
+			}
+		});
+
+		return takeoffData;
 	}
 
 	return (
 		<div className="container p-4 mx-auto space-y-8">
-			<Card>
-				<CardHeader>
-					<CardTitle>File Processor</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<form onSubmit={handleSubmit} className="space-y-4">
-						<div {...getRootProps()} className={`border-2 border-dashed rounded-md p-8 text-center cursor-pointer transition-colors ${isDragActive ? "border-primary bg-primary/10" : "border-gray-300 hover:border-primary"}`}>
-							<input {...getInputProps()} />
-							<Upload className="w-12 h-12 mx-auto text-gray-400" />
-							{isDragActive ? <p className="mt-2">Drop the file here ...</p> : <p className="mt-2">Drag & drop a file here, or click to select a file</p>}
-							<p className="mt-1 text-xs text-gray-500">Supported files: PDF, DWG, DXF</p>
-						</div>
-						{file && <p className="text-sm text-gray-600">Selected file: {file.name}</p>}
-						<Button type="submit" disabled={!file || processing}>
-							{processing ? "Processing..." : "Process File"}
-						</Button>
-					</form>
-				</CardContent>
-			</Card>
+			<form onSubmit={handleSubmit} className="space-y-4">
+				<div {...getRootProps()} className="p-6 text-center border-2 border-gray-300 border-dashed rounded-lg">
+					<input {...getInputProps()} />
+					{isDragActive ? (
+						<p>Drop the file here ...</p>
+					) : (
+						<p>Drag &apos;n&apos; drop a file here, or click to select a file</p>
+					)}
+				</div>
+				<Button type="submit" disabled={!file || processing}>
+					{processing ? "Processing..." : "Process File"}
+				</Button>
+			</form>
 
-			<Card>
-				<CardHeader>
-					<CardTitle>Processing Steps</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div className="space-y-2">
-						{processingSteps.map((step, index) => (
-							<div key={index} className="flex items-center space-x-2">
-								<div className="w-4 h-4 border border-gray-300 rounded-full" />
-								<span className="text-gray-500">{step}</span>
-							</div>
-						))}
-					</div>
-				</CardContent>
-			</Card>
-
-			{layersData && (
+			{forgeData && (
 				<Card>
 					<CardHeader>
-						<CardTitle>Extracted Layers</CardTitle>
+						<CardTitle>Forge Data</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p>File: {layersData.fileName}</p>
-						<p>Size: {layersData.size} bytes</p>
-						<p>URN: {layersData.urn}</p>
-						<h3>Layers:</h3>
-						<ul>
-							{layersData.layers.map((layer, index) => (
-								<li key={index}>{layer.name}</li>
+						<CollapsibleJSON title="Metadata" data={forgeData.metadata} />
+						<CollapsibleJSON title="Manifest" data={forgeData.manifest} />
+
+						<h3 className="mb-2 font-bold">Viewables</h3>
+						{forgeData.viewables.map((viewable, index) => (
+							<div key={index} className="mb-4">
+								<h4 className="font-semibold">{viewable.name} ({viewable.role})</h4>
+								<p>GUID: {viewable.guid}</p>
+								<p>Status: {viewable.status}</p>
+								<CollapsibleJSON title="Viewable Details" data={viewable} />
+								{viewable.children && (
+									<CollapsibleJSON title="Children" data={viewable.children} />
+								)}
+								{viewable.properties ? (
+									<CollapsibleJSON title="Properties" data={viewable.properties} />
+								) : (
+									<p className="mt-2">No property data available</p>
+								)}
+							</div>
+						))}
+
+						<CollapsibleJSON title="Thumbnails" data={forgeData.thumbnails} />
+					</CardContent>
+				</Card>
+			)}
+
+			{propertyData && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Property Database</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="space-y-4">
+							{propertyData.map((database, index) => (
+								<CollapsibleJSON
+									key={index}
+									title={`Database ${index + 1}`}
+									data={database}
+								/>
 							))}
-						</ul>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
+			{error && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Error</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<p className="text-red-500">{error}</p>
 					</CardContent>
 				</Card>
 			)}
