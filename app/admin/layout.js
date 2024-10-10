@@ -228,7 +228,7 @@ function Sidebar() {
   const { isOpen, setIsOpen, currentItem, setCurrentItem } = useSidebarContext()
 
   const menuItems = [
-		{ name: "Takoff", icon: FileText, href: "/admin/takeoff" },
+		// { name: "Takoff", icon: FileText, href: "/admin/takeoff" },
 		{ name: "Estimates", icon: FileText, href: "/admin/" },
 		{ name: "Line Items", icon: List, href: "/admin/line-items" },
 		{ name: "Tags", icon: Tag, href: "/admin/tags" },

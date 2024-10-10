@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, Suspense } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,24 +12,16 @@ function CollapsibleJSON({ title, data }) {
 
 	return (
 		<div className="mb-4">
-			<Button
-				onClick={() => setIsOpen(!isOpen)}
-				variant="outline"
-				className="justify-between w-full"
-			>
+			<Button onClick={() => setIsOpen(!isOpen)} variant="outline" className="justify-between w-full">
 				{title}
 				{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
 			</Button>
-			{isOpen && (
-				<pre className="p-4 mt-2 overflow-x-auto bg-gray-100 rounded">
-					{JSON.stringify(data, null, 2)}
-				</pre>
-			)}
+			{isOpen && <pre className="p-4 mt-2 overflow-x-auto bg-gray-100 rounded">{JSON.stringify(data, null, 2)}</pre>}
 		</div>
 	);
 }
 
-export default function FileProcessor() {
+function FileProcessor({ accessToken }) {
 	const [file, setFile] = useState(null);
 	const [processing, setProcessing] = useState(false);
 	const [forgeData, setForgeData] = useState(null);
@@ -41,7 +33,7 @@ export default function FileProcessor() {
 	useEffect(() => {
 		const accessToken = searchParams.get("access_token");
 		if (accessToken) {
-			console.log('Setting access token:', accessToken);
+			console.log("Setting access token:", accessToken);
 			setToken(accessToken);
 		}
 	}, [searchParams]);
@@ -81,13 +73,13 @@ export default function FileProcessor() {
 			}
 
 			const data = await response.json();
-			console.log('Forge API response:', data);
+			console.log("Forge API response:", data);
 			setForgeData(data.forgeData);
-			
+
 			if (data.forgeData && data.forgeData.propertyDatabases) {
 				setPropertyData(data.forgeData.propertyDatabases);
 				const takeoffData = processPropertyData(data.forgeData.propertyDatabases);
-				console.log('Takeoff Data:', takeoffData);
+				console.log("Takeoff Data:", takeoffData);
 				// You can set this to a new state variable if you want to display it
 				// setTakeoffData(takeoffData);
 			}
@@ -102,24 +94,24 @@ export default function FileProcessor() {
 	function processPropertyData(propertyData) {
 		const takeoffData = {
 			pipes: [],
-			fittings: []
+			fittings: [],
 		};
 
-		propertyData.forEach(database => {
+		propertyData.forEach((database) => {
 			if (database.data && database.data.collection) {
-				database.data.collection.forEach(item => {
-					if (item.name === 'Pipe') {
+				database.data.collection.forEach((item) => {
+					if (item.name === "Pipe") {
 						takeoffData.pipes.push({
 							id: item.objectid,
-							diameter: item.properties.find(prop => prop.name === 'Diameter')?.value,
-							length: item.properties.find(prop => prop.name === 'Length')?.value,
-							material: item.properties.find(prop => prop.name === 'Material')?.value
+							diameter: item.properties.find((prop) => prop.name === "Diameter")?.value,
+							length: item.properties.find((prop) => prop.name === "Length")?.value,
+							material: item.properties.find((prop) => prop.name === "Material")?.value,
 						});
-					} else if (item.name === 'Fitting') {
+					} else if (item.name === "Fitting") {
 						takeoffData.fittings.push({
 							id: item.objectid,
-							type: item.properties.find(prop => prop.name === 'Type')?.value,
-							size: item.properties.find(prop => prop.name === 'Size')?.value
+							type: item.properties.find((prop) => prop.name === "Type")?.value,
+							size: item.properties.find((prop) => prop.name === "Size")?.value,
 						});
 					}
 				});
@@ -134,11 +126,7 @@ export default function FileProcessor() {
 			<form onSubmit={handleSubmit} className="space-y-4">
 				<div {...getRootProps()} className="p-6 text-center border-2 border-gray-300 border-dashed rounded-lg">
 					<input {...getInputProps()} />
-					{isDragActive ? (
-						<p>Drop the file here ...</p>
-					) : (
-						<p>Drag &apos;n&apos; drop a file here, or click to select a file</p>
-					)}
+					{isDragActive ? <p>Drop the file here ...</p> : <p>Drag &apos;n&apos; drop a file here, or click to select a file</p>}
 				</div>
 				<Button type="submit" disabled={!file || processing}>
 					{processing ? "Processing..." : "Process File"}
@@ -157,18 +145,14 @@ export default function FileProcessor() {
 						<h3 className="mb-2 font-bold">Viewables</h3>
 						{forgeData.viewables.map((viewable, index) => (
 							<div key={index} className="mb-4">
-								<h4 className="font-semibold">{viewable.name} ({viewable.role})</h4>
+								<h4 className="font-semibold">
+									{viewable.name} ({viewable.role})
+								</h4>
 								<p>GUID: {viewable.guid}</p>
 								<p>Status: {viewable.status}</p>
 								<CollapsibleJSON title="Viewable Details" data={viewable} />
-								{viewable.children && (
-									<CollapsibleJSON title="Children" data={viewable.children} />
-								)}
-								{viewable.properties ? (
-									<CollapsibleJSON title="Properties" data={viewable.properties} />
-								) : (
-									<p className="mt-2">No property data available</p>
-								)}
+								{viewable.children && <CollapsibleJSON title="Children" data={viewable.children} />}
+								{viewable.properties ? <CollapsibleJSON title="Properties" data={viewable.properties} /> : <p className="mt-2">No property data available</p>}
 							</div>
 						))}
 
@@ -185,11 +169,7 @@ export default function FileProcessor() {
 					<CardContent>
 						<div className="space-y-4">
 							{propertyData.map((database, index) => (
-								<CollapsibleJSON
-									key={index}
-									title={`Database ${index + 1}`}
-									data={database}
-								/>
+								<CollapsibleJSON key={index} title={`Database ${index + 1}`} data={database} />
 							))}
 						</div>
 					</CardContent>
@@ -206,6 +186,18 @@ export default function FileProcessor() {
 					</CardContent>
 				</Card>
 			)}
+		</div>
+	);
+}
+
+export default function TakeoffPage() {
+	const searchParams = useSearchParams();
+	const accessToken = searchParams.get("access_token");
+
+	return (
+		<div className="container p-4 mx-auto space-y-8">
+			<h1 className="text-4xl font-bold">Takeoff</h1>
+			<FileProcessor accessToken={accessToken} />
 		</div>
 	);
 }
